@@ -15,9 +15,7 @@
     "symfony/http-client": "^7.2"
   },
   "autoload": {
-    "psr-4": {
-      "SCA\\FedexApi\\": "src/"
-    }
+    "psr-4": {"SCA\\FedexApi\\": "src"}
   },
   "minimum-stability": "stable",
   "prefer-stable": "dev"
