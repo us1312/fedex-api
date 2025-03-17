@@ -1,0 +1,24 @@
+{
+  "name": "sca/fedexapi",
+  "description": "A simple library to work with Fedex API",
+  "type": "library",
+  "license": "MIT",
+  "authors": [
+    {
+      "name": "SCA",
+      "email": "support@scaa.com",
+      "role": "Developer"
+    }
+  ],
+  "require": {
+    "php": "^8.0",
+    "symfony/http-client": "^7.2"
+  },
+  "autoload": {
+    "psr-4": {
+      "SCA\\FedexApi\\": "src/"
+    }
+  },
+  "minimum-stability": "stable",
+  "prefer-stable": true
+}
