@@ -1,5 +1,5 @@
 {
-  "name": "sca/fedexapi",
+  "name": "sca/fedex-api",
   "description": "A simple library to work with Fedex API",
   "type": "library",
   "license": "MIT",
