@@ -19,6 +19,12 @@
       "SCA\\FedexApi\\": "src/"
     }
   },
+  "repositories": [
+    {
+      "type": "git",
+      "url": "https://github.com/us1312/fedex-api.git"
+    }
+  ],
   "minimum-stability": "stable",
   "prefer-stable": true
 }
