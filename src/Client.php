@@ -13,6 +13,8 @@ class Client {
 
     private string $apiSecret;
 
+    private string $apiAccountNo;
+
     private string $apiUrl;
 
     private string $accessToken;
@@ -21,9 +23,10 @@ class Client {
         private readonly HttpClientInterface $httpClient
     ) {}
 
-    public function setCredentials(string $apiKey, string $apiSecret, string $apiUrl) {
+    public function setCredentials(string $apiKey, string $apiSecret, string $apiAccountNo, string $apiUrl) {
         $this->apiKey = $apiKey;
         $this->apiSecret = $apiSecret;
+        $this->apiAccountNo = $apiAccountNo;
         $this->apiUrl = $apiUrl;
         $this->authorize();
     }
@@ -31,6 +34,7 @@ class Client {
     public function makeRequest(string $type, string $endpoint, array $body, array $headers, $needsAuthorization = true) {
         if ($needsAuthorization) {
             $headers['authorization'] = 'Bearer ' . $this->getAccessToken();
+            $body['accountNumber']['value'] = $this->apiAccountNo;
         }
         if (is_array($body) && $headers['Content-Type'] === 'application/json') {
             $body = json_encode($body);
@@ -73,12 +77,9 @@ class Client {
             return json_decode($content, true);
         } else if (json_validate($content)) {
             $content = json_decode($content, true);
-            $message = '';
-            if (isset($content['errors'])) {
-                foreach ($content['errors'] as $error) {
-                    $message .= $error['message'] . ' ';
-                }
-                throw new FedexBadResponseException($message);
+            $message = [];
+            if (isset($content)) {
+                throw new FedexBadResponseException(json_encode($content));
             }
             throw new FedexBadResponseException('Unknown error from Fedex authorizaton!');
         } else {
