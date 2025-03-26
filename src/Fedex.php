@@ -59,10 +59,10 @@ class Fedex {
         ];
         $body = [
             'requestedShipment' => [
-                'pickupType' => 'CONTACT_FEDEX_TO_SCHEDULE',
+                'pickupType' => 'DROPOFF_AT_FEDEX_LOCATION',
                 'serviceType' => 'INTERNATIONAL_ECONOMY', //FEDEX_REGIONAL_ECONOMY, INTERNATIONAL_ECONOMY
                 'packagingType' => 'YOUR_PACKAGING', //YOUR_PACKAGING / FEDEX_ENVELOPE / FEX_BOX / FEDEX_PAK / FEDEX_TUBE
-                'total_weight' => 20.0,
+                'total_weight' => 44.1,
                 'totalDeclaredValue' => [
                     'amount' => '234.32',
                     'currency' => 'PLN',
@@ -70,7 +70,7 @@ class Fedex {
                 'shipper' => [
                     'contact' => [
                         'personName' => 'Ferdynand Kiepski',
-                        'phoneNumber' => '889658785',
+                        'phoneNumber' => '48889658785',
                     ],
                     'address' => [
                         'streetLines' => [
@@ -97,7 +97,7 @@ class Fedex {
                         ],
                         'contact' => [
                             'personName' => 'Radosław Tadeja',
-                            'phoneNumber' => '609115648',
+                            'phoneNumber' => '48609115648',
                         ]
                     ],
                 ],
@@ -107,22 +107,15 @@ class Fedex {
                 'shipmentSpecialServices' => [
                     'specialServiceTypes' => [
                         'ELECTRONIC_TRADE_DOCUMENTS',
-
                     ],
                     'etdDetail' => [
-                        'attributes' => [
-                            'POST_SHIPMENT_UPLOAD_REQUESTED'
-                        ],
                         'attachedDocuments' => [
                             [
-                                'documentType' => 'PRO_FORMA_INVOICE',
-                                'documentReference' => 'DocumentReference',
-                                'description' => 'PRO FORMA INVOICE',
-                                'documentId' => 'proformainvoiceid'
+                                'documentId' => '1231231321313'
                             ]
                         ],
                         'requestedDocumentTypes' => [
-                            'PRO_FORMA_INVOICE',
+                            'COMMERCIAL_INVOICE',
                         ]
                     ],
                 ],
@@ -162,8 +155,6 @@ class Fedex {
                     ]
                 ],
                 'labelSpecification' => [
-                    'labelFormatType' => 'LABEL_DATA_ONLY', // LABEL_DATA_ONLY / COMMON2D
-                    'labelOrder' => 'SHIPPING_LABEL_FIRST', // SHIPPING_LABEL_FIRST / SHIPPING_LABEL_LAST
                     'labelStockType' => 'PAPER_4X6', // "PAPER_4X6" "STOCK_4X675" "PAPER_4X675" "PAPER_4X8" "PAPER_4X9" "PAPER_7X475" "PAPER_85X11_BOTTOM_HALF_LABEL" "PAPER_85X11_TOP_HALF_LABEL" "PAPER_LETTER" "STOCK_4X675_LEADING_DOC_TAB" "STOCK_4X8" "STOCK_4X9_LEADING_DOC_TAB" "STOCK_4X6" "STOCK_4X675_TRAILING_DOC_TAB" "STOCK_4X9_TRAILING_DOC_TAB" "STOCK_4X9" "STOCK_4X85_TRAILING_DOC_TAB" "STOCK_4X105_TRAILING_DOC_TAB"
                     'imageType' => 'PDF',
                 ],
@@ -171,7 +162,7 @@ class Fedex {
                     [
                         'sequenceNumber' => 1,
                         'weight' => [
-                            'value' => '20.0',
+                            'value' => 20.0,
                             'units' => 'KG',
                         ],
                         'itemDescriptionForClearance' => 'item description',
@@ -179,8 +170,9 @@ class Fedex {
                 ]
             ],
             'labelResponseOptions' => 'URL_ONLY',
+            'shopAction' => 'CONFIRM',
             'accountNumber' => [
-                'value' => '1234567890',
+                'value' => $this->client->getApiAccountNo()
             ],
         ];
 
@@ -210,6 +202,104 @@ class Fedex {
             $haha = $results;
 
             return $body;
+        } catch (FedexException $e) {
+            $errors = json_decode($e->getMessage(), true);
+            $exception = [];
+            if ($errors['transactionId']) {
+                try {
+                    $this->retrieveASyncShipment($errors['transactionId']);
+                } catch (FedexException $e) {
+                    $errors = json_decode($e->getMessage(), true);
+                    foreach ($errors as $error) {
+                        $exception[$error['code']] = ErrorTypes::get($error['code']);
+                    }
+                    throw new FedexBadResponseException(json_encode($exception));
+                }
+
+            }
+            foreach ($errors as $error) {
+                $exception[$error['code']] = ErrorTypes::get($error['code']);
+            }
+
+            throw new FedexBadResponseException(json_encode($exception));
+        }
+    }
+
+    public function uploadDocument(string $pdfFile, string $documentName) {
+        $encoded = base64_encode(file_get_contents($pdfFile));
+        $headers = [
+            'Content-Type' => 'multipart/form-data',
+        ];
+
+        $body = [
+            'document' => [
+                'workflowName' => 'ETDPreshipment',
+                'name' => basename($pdfFile),
+                'contentType' => 'application/pdf',
+                'meta' => [
+                    'shipDocumentType' => 'PRO_FORMA_INVOICE', // COMMERCIAL_INVOICE
+                    'originCountryCode' => 'PL',
+                    'destinationCountryCode' => 'JP',
+                ]
+            ],
+            'attachment' => fopen($pdfFile, 'r'),
+        ];
+        $file = fopen($pdfFile, 'r');
+        $a = fread($file, filesize($pdfFile));
+        fclose($file);
+
+        $body['attachment'] = $a;
+        $body['document'] = json_encode($body['document']);
+        try {
+            $results = $this->client->makeRequest('POST', Endpoints::UPLOAD_DOCUMENT->getEndpoint(), $body, $headers);
+            $haha = $results;
+
+            return $results;
+        } catch (FedexException $e) {
+            $errors = json_decode($e->getMessage(), true);
+            $exception = [];
+            if ($errors['transactionId']) {
+                try {
+                    $this->retrieveASyncShipment($errors['transactionId']);
+                } catch (FedexException $e) {
+                    $errors = json_decode($e->getMessage(), true);
+                    foreach ($errors as $error) {
+                        $exception[$error['code']] = ErrorTypes::get($error['code']);
+                    }
+                    throw new FedexBadResponseException(json_encode($exception));
+                }
+
+            }
+            foreach ($errors as $error) {
+                $exception[$error['code']] = ErrorTypes::get($error['code']);
+            }
+
+            throw new FedexBadResponseException(json_encode($exception));
+        }
+
+    }
+
+    public function getShipmentRegulatoryDetails() {
+        $headers = [
+            'Content-Type' => 'application/json',
+        ];
+
+        $body = [
+            'serviceType' => 'INTERNATIONAL_ECONOMY',
+            'originAddress' => [
+                'countryCode' => 'PL',
+            ],
+            'destinationAddress' => [
+                'countryCode' => 'JP',
+            ],
+            'carrierCode' => 'FDXE',
+        ];
+
+        try {
+            $results = $this->client->makeRequest('POST', Endpoints::SHIPMENT_REGULATORY_DETAILS->getEndpoint(), [], $headers);
+            $haha = $results;
+
+            return $results;
         } catch (FedexException $e) {
             $errors = json_decode($e->getMessage(), true);
             $exception = [];

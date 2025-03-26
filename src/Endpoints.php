@@ -11,6 +11,10 @@ enum Endpoints {
     case VALIDATE_SHIPMENT;
 
     case RETRIEVE_ASYNC_SHIPMENT;
+
+    case UPLOAD_DOCUMENT;
+
+    case SHIPMENT_REGULATORY_DETAILS;
     
     public function getEndpoint(): string {
         return match ($this) {
@@ -18,6 +22,8 @@ enum Endpoints {
             self::CREATE_SHIPMENT => 'ship/v1/shipments',
             self::VALIDATE_SHIPMENT => 'ship/v1/shipments/packages/validate',
             self::RETRIEVE_ASYNC_SHIPMENT => 'ship/v1/shipments/results',
+            self::UPLOAD_DOCUMENT => 'documents/v1/etds/upload',
+            self::SHIPMENT_REGULATORY_DETAILS => 'globaltrade/v1/shipments/regulatorydetails/retrieve',
         };
     }
 }

@@ -34,12 +34,18 @@ class Client {
     public function makeRequest(string $type, string $endpoint, array $body, array $headers, $needsAuthorization = true) {
         if ($needsAuthorization) {
             $headers['authorization'] = 'Bearer ' . $this->getAccessToken();
-            $body['accountNumber']['value'] = $this->apiAccountNo;
         }
-        if (is_array($body) && $headers['Content-Type'] === 'application/json') {
+        if (is_array($body) && in_array($headers['Content-Type'], ['application/json'])) {
             $body = json_encode($body);
         }
-        $response  = $this->httpClient->request($type, $this->apiUrl . '/' . $endpoint, [
+
+        if ($endpoint == Endpoints::UPLOAD_DOCUMENT->getEndpoint()) {
+            $url = 'https://documentapitest.prod.fedex.com/sandbox/documents/v1/etds/upload';
+        } else {
+            $url = $this->apiUrl . '/' . $endpoint;
+        }
+
+        $response  = $this->httpClient->request($type, $url, [
             'headers' => $headers,
             'body' => $body
         ]);
@@ -85,5 +91,9 @@ class Client {
         } else {
             throw new FedexBadResponseException('Unknown error from Fedex authorizaton!');
         }
+    }
+
+    public function getApiAccountNo(): string {
+        return $this->apiAccountNo;
     }
 }
