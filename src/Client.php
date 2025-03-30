@@ -5,6 +5,7 @@ namespace SCA\FedexApi;
 use SCA\FedexApi\Exception\FedexAuthorizeErrorException;
 use SCA\FedexApi\Exception\FedexBadResponseException;
 use SCA\FedexApi\Exception\FedexException;
+use Symfony\Component\HttpClient\HttpClient;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 class Client {
@@ -15,7 +16,7 @@ class Client {
 
     private string $apiAccountNo;
 
-    private string $apiUrl;
+    private string $env;
 
     private string $accessToken;
 
@@ -23,11 +24,11 @@ class Client {
         private readonly HttpClientInterface $httpClient
     ) {}
 
-    public function setCredentials(string $apiKey, string $apiSecret, string $apiAccountNo, string $apiUrl) {
+    public function setCredentials(string $apiKey, string $apiSecret, string $apiAccountNo, string $env) {
         $this->apiKey = $apiKey;
         $this->apiSecret = $apiSecret;
         $this->apiAccountNo = $apiAccountNo;
-        $this->apiUrl = $apiUrl;
+        $this->env = $env;
         $this->authorize();
     }
 
@@ -35,14 +36,11 @@ class Client {
         if ($needsAuthorization) {
             $headers['authorization'] = 'Bearer ' . $this->getAccessToken();
         }
-        if (is_array($body) && in_array($headers['Content-Type'], ['application/json'])) {
-            $body = json_encode($body);
-        }
 
-        if ($endpoint == Endpoints::UPLOAD_DOCUMENT->getEndpoint()) {
+        if ($endpoint == Endpoints::UPLOAD_DOCUMENT->getEndpoint($this->env)) {
             $url = 'https://documentapitest.prod.fedex.com/sandbox/documents/v1/etds/upload';
         } else {
-            $url = $this->apiUrl . '/' . $endpoint;
+            $url = Endpoints::PROD_URL->getBaseUrl($this->env) . $endpoint;
         }
 
         $response  = $this->httpClient->request($type, $url, [
@@ -51,6 +49,10 @@ class Client {
         ]);
 
         return $this->handleResponse($response);
+    }
+
+    public function makeRequestUploadFile($data, $endpoint) {
+        $client = HttpClient::create();
     }
 
     private function setAccessToken(string $accessToken) {
@@ -79,7 +81,7 @@ class Client {
         $status = $response->getStatusCode(false);
         $content = $response->getContent(false);
 
-        if (200 === $status && json_validate($content)) {
+        if (in_array($status, [200, 201]) && json_validate($content)) {
             return json_decode($content, true);
         } else if (json_validate($content)) {
             $content = json_decode($content, true);
