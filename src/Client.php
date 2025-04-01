@@ -43,6 +43,10 @@ class Client {
             $url = Endpoints::PROD_URL->getBaseUrl($this->env) . $endpoint;
         }
 
+        if (isset($headers['Content-Type']) && $headers['Content-Type'] == 'application/json') {
+            $body = json_encode($body);
+        }
+
         $response  = $this->httpClient->request($type, $url, [
             'headers' => $headers,
             'body' => $body

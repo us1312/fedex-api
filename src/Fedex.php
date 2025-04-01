@@ -61,130 +61,10 @@ class Fedex {
             'Content-Type' => 'application/json',
             'x-locale' => 'en_US',
         ];
-        $body = [
-            'requestedShipment' => [
-                'pickupType' => 'DROPOFF_AT_FEDEX_LOCATION',
-                'serviceType' => 'INTERNATIONAL_ECONOMY', //FEDEX_REGIONAL_ECONOMY, INTERNATIONAL_ECONOMY
-                'packagingType' => 'YOUR_PACKAGING', //YOUR_PACKAGING / FEDEX_ENVELOPE / FEX_BOX / FEDEX_PAK / FEDEX_TUBE
-                'total_weight' => 44.1,
-                'totalDeclaredValue' => [
-                    'amount' => '234.32',
-                    'currency' => 'PLN',
-                ],
-                'shipper' => [
-                    'contact' => [
-                        'personName' => 'Ferdynand Kiepski',
-                        'phoneNumber' => '48889658785',
-                    ],
-                    'address' => [
-                        'streetLines' => [
-                            'Piotra Skargi 3'
-                        ],
-                        'city' => 'Lębork',
-                        'stateOrProvinceCode' => '',
-                        'postalCode' => '84-300',
-                        'countryCode' => 'PL',
-                    ],
-
-                ],
-                'recipients' => [
-                    [
-                        'address' => [
-                            'streetLines' => [
-                                '1-23-45 Shibuya',
-                                'Shibuya City'
-                            ],
-                            'city' => 'Tokyo',
-                            'stateOrProvinceCode' => '',
-                            'postalCode' => '150-0002',
-                            'countryCode' => 'JP',
-                        ],
-                        'contact' => [
-                            'personName' => 'Radosław Tadeja',
-                            'phoneNumber' => '48609115648',
-                        ]
-                    ],
-                ],
-                'shippingChargesPayment' => [
-                    'paymentType' => 'SENDER', // SENDER / RECIPIENT / THIRD_PARTY / COLLECT
-                ],
-                'shipmentSpecialServices' => [
-                    'specialServiceTypes' => [
-                        'ELECTRONIC_TRADE_DOCUMENTS',
-                    ],
-                    'etdDetail' => [
-                        'attachedDocuments' => [
-                            [
-                                'documentId' => '1231231321313'
-                            ]
-                        ],
-                        'requestedDocumentTypes' => [
-                            'COMMERCIAL_INVOICE',
-                        ]
-                    ],
-                ],
-                'customsClearanceDetail' => [
-                    'dutiesPayment' => [
-                        'paymentType' => 'SENDER',
-                    ],
-                    'commodities' => [
-                        [
-                            'unitPrice' => [
-                                'amount' => 234.32,
-                                'currency' => 'PLN',
-                            ],
-                            'additionalMeasures' => [
-                                [
-                                    'quantity' => 1.0,
-                                    'units' => 'KG',
-                                ]
-                            ],
-                            'numberOfPieces' => 1,
-                            'quantity' => 1,
-                            'quantityUnits' => 'NO',
-                            'weight' => [
-                                'units' => 'KG',
-                                'value' => 20.0,
-                            ],
-                            'quantityUnits' => 'KG',
-                            'description' => 'item description',
-                            'name' => 'Product Name',
-                            'countryOfManufacture' => 'PL',
-                            'harmonizedCode' => '0545', // THIS IS VERY IMPORTANT CODE, EVERY PRODUCT HAS TO HAVE ONE
-                        ]
-                    ],
-                    'totalCustomsValue' => [
-                        'amount' => '234.32',
-                        'currency' => 'PLN',
-                    ]
-                ],
-                'labelSpecification' => [
-                    'labelStockType' => 'PAPER_4X6', // "PAPER_4X6" "STOCK_4X675" "PAPER_4X675" "PAPER_4X8" "PAPER_4X9" "PAPER_7X475" "PAPER_85X11_BOTTOM_HALF_LABEL" "PAPER_85X11_TOP_HALF_LABEL" "PAPER_LETTER" "STOCK_4X675_LEADING_DOC_TAB" "STOCK_4X8" "STOCK_4X9_LEADING_DOC_TAB" "STOCK_4X6" "STOCK_4X675_TRAILING_DOC_TAB" "STOCK_4X9_TRAILING_DOC_TAB" "STOCK_4X9" "STOCK_4X85_TRAILING_DOC_TAB" "STOCK_4X105_TRAILING_DOC_TAB"
-                    'imageType' => 'PDF',
-                ],
-                'requestedPackageLineItems' => [
-                    [
-                        'sequenceNumber' => 1,
-                        'weight' => [
-                            'value' => 20.0,
-                            'units' => 'KG',
-                        ],
-                        'itemDescriptionForClearance' => 'item description',
-                    ]
-                ]
-            ],
-            'labelResponseOptions' => 'URL_ONLY',
-            'shopAction' => 'CONFIRM',
-            'accountNumber' => [
-                'value' => $this->client->getApiAccountNo()
-            ],
-        ];
-        $body = json_encode($body);
         try {
-            $results = $this->client->makeRequest('POST', Endpoints::VALIDATE_SHIPMENT->getEndpoint(), $body, $headers);
-            $haha = $results;
+            $results = $this->client->makeRequest('POST', Endpoints::VALIDATE_SHIPMENT->getEndpoint(), $data, $headers);
 
-            return $body;
+            return $results;
         } catch (FedexException $e) {
             $errors = json_decode($e->getMessage(), true);
             $exception = [];
@@ -202,11 +82,7 @@ class Fedex {
                 'Content-Type' => 'application/json',
                 'x-locale' => 'en_US',
             ];
-            $data = json_encode($data);
-            $results = $this->client->makeRequest('POST', Endpoints::CREATE_SHIPMENT->getEndpoint(), $data, $headers);
-            $haha = $results;
-
-            return $body;
+            return $this->client->makeRequest('POST', Endpoints::CREATE_SHIPMENT->getEndpoint(), $data, $headers);
         } catch (FedexException $e) {
             $errors = json_decode($e->getMessage(), true);
             $exception = [];
@@ -227,7 +103,7 @@ class Fedex {
 
         $mimeType = $mimeTypeService->guessMimeType($filePath);
         $extension = $mimeTypeService->getExtensions($mimeType);
-        $filename = substr(strtr(base64_encode(random_bytes(8)), '+/', ''), 0, 10) . '.' . array_key_first($e);
+        $filename = substr(strtr(base64_encode(random_bytes(8)), '+/', ''), 0, 10) . '.' . $extension[array_key_first($extension)];
         $client = HttpClient::create();
 
         $fileHandle = fopen($filePath, 'r');
