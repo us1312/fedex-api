@@ -935,9 +935,6 @@ class ErrorTypes
     ];
 
     public static function get($code) {
-        if (isset(self::$errors[$code])) {
-            return self::$errors[$code];
-        }
-        return "$code is unknown!";
+        return self::$errors[$code];
     }
 }

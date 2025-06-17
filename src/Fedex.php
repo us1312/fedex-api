@@ -2,6 +2,7 @@
 
 namespace SCA\FedexApi;
 
+
 use SCA\FedexApi\Error\Errors;
 use SCA\FedexApi\Error\ErrorTypes;
 use SCA\FedexApi\Exception\FedexAuthorizeErrorException;
@@ -9,8 +10,6 @@ use SCA\FedexApi\Exception\FedexBadResponseException;
 use SCA\FedexApi\Exception\FedexException;
 use SCA\FedexApi\Validation\CountryValidator;
 use Symfony\Component\DependencyInjection\Attribute\TaggedIterator;
-use Symfony\Component\HttpClient\HttpClient;
-use Symfony\Component\Mime\MimeTypes;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 class Fedex {
@@ -25,8 +24,8 @@ class Fedex {
         $this->countryValidator = new CountryValidator($countries);
     }
     
-    public function setCredentials(string $apiKey, string $apiSecret, string $apiAccountNo, string $env) {
-        $this->client->setCredentials($apiKey, $apiSecret, $apiAccountNo, $env);
+    public function setCredentials(string $apiKey, string $apiSecret, string $apiAccountNo, string $apiUrl) {
+        $this->client->setCredentials($apiKey, $apiSecret, $apiAccountNo, $apiUrl);
     }
 
     public function validateAddress(array $street, string $country, string $city = '', string $state = '', string $postal = '', ) {
@@ -50,17 +49,15 @@ class Fedex {
             ]
         ];
 
-        $body = json_encode($body);
-
-        return $this->client->makeRequest('POST', Endpoints::ADDRESS->getEndpoint($env), $body, $headers);
+        return $this->client->makeRequest('POST', Endpoints::ADDRESS->getEndpoint(), $body, $headers);
     }
 
     public function validateShipment(array $data) {
-
         $headers = [
             'Content-Type' => 'application/json',
             'x-locale' => 'en_US',
         ];
+
         try {
             $results = $this->client->makeRequest('POST', Endpoints::VALIDATE_SHIPMENT->getEndpoint(), $data, $headers);
 
@@ -82,51 +79,7 @@ class Fedex {
                 'Content-Type' => 'application/json',
                 'x-locale' => 'en_US',
             ];
-            return $this->client->makeRequest('POST', Endpoints::CREATE_SHIPMENT->getEndpoint(), $data, $headers);
-        } catch (FedexException $e) {
-            $errors = json_decode($e->getMessage(), true);
-            $exception = [];
-            if ($errors['transactionId']) {
-                $errors = json_decode($e->getMessage(), true);
-
-                foreach ($errors as $error) {
-                    $exception[$error['code']] = ErrorTypes::get($error['code']);
-                }
-
-                throw new FedexBadResponseException(json_encode($exception));
-            }
-        }
-    }
-
-    public function uploadDocument(string $filePath, $documentType = 'PRO_FORMA_INVOICE', $originCountryCode = 'PL', $destinationCountryCode = 'JP' ) {
-        $mimeTypeService = MimeTypes::getDefault();
-
-        $mimeType = $mimeTypeService->guessMimeType($filePath);
-        $extension = $mimeTypeService->getExtensions($mimeType);
-        $filename = substr(strtr(base64_encode(random_bytes(8)), '+/', ''), 0, 10) . '.' . $extension[array_key_first($extension)];
-        $client = HttpClient::create();
-
-        $fileHandle = fopen($filePath, 'r');
-        stream_context_set_option($fileHandle, 'http', 'filename', $filename);
-        stream_context_set_option($fileHandle, 'http', 'content-type', $mimeType);
-
-        $documentData = [
-            'workflowName'    => 'ETDPreshipment',           // or 'ETDPostshipment'
-            'name'            => $filename,        // filename - MUST BE ENDED BY .mimeType
-            'contentType'     => $mimeType,          // mimetype of file
-            'meta' => [
-                'shipDocumentType'     => $documentType,
-                'originCountryCode'    => $originCountryCode,              // shipper country code
-                'destinationCountryCode' => $destinationCountryCode             // receiver country code
-            ]
-        ];
-        $body = [
-            'document' => json_encode($documentData),
-            'attachment' => $fileHandle,
-        ];
-
-        try {
-            $results = $this->client->makeRequest('POST', Endpoints::UPLOAD_DOCUMENT->getEndpoint(), $body, []);
+            $results = $this->client->makeRequest('POST', Endpoints::CREATE_SHIPMENT->getEndpoint(), $data, $headers);
 
             return $results;
         } catch (FedexException $e) {
@@ -147,8 +100,63 @@ class Fedex {
             foreach ($errors as $error) {
                 $exception[$error['code']] = ErrorTypes::get($error['code']);
             }
+
             throw new FedexBadResponseException(json_encode($exception));
         }
+    }
+
+    public function uploadDocument(string $pdfFile, string $documentName, string $originCountryCode, string $destinationCountryCode) {
+        $encoded = base64_encode(file_get_contents($pdfFile));
+        $headers = [
+            'Content-Type' => 'multipart/form-data',
+        ];
+
+        $body = [
+            'document' => [
+                'workflowName' => 'ETDPreshipment',
+                'name' => basename($pdfFile),
+                'contentType' => 'application/pdf',
+                'meta' => [
+                    'shipDocumentType' => 'PRO_FORMA_INVOICE',
+                    'originCountryCode' => $originCountryCode,
+                    'destinationCountryCode' => $destinationCountryCode
+                ]
+            ],
+            'attachment' => fopen($pdfFile, 'r'),
+        ];
+        $file = fopen($pdfFile, 'r');
+        $a = fread($file, filesize($pdfFile));
+        fclose($file);
+
+        $body['attachment'] = $a;
+        $body['document'] = json_encode($body['document']);
+        try {
+            $results = $this->client->makeRequest('POST', Endpoints::UPLOAD_DOCUMENT->getEndpoint(), $body, $headers);
+            $haha = $results;
+
+            return $results;
+        } catch (FedexException $e) {
+            $errors = json_decode($e->getMessage(), true);
+            $exception = [];
+            if ($errors['transactionId']) {
+                try {
+                    $this->retrieveASyncShipment($errors['transactionId']);
+                } catch (FedexException $e) {
+                    $errors = json_decode($e->getMessage(), true);
+                    foreach ($errors as $error) {
+                        $exception[$error['code']] = ErrorTypes::get($error['code']);
+                    }
+                    throw new FedexBadResponseException(json_encode($exception));
+                }
+
+            }
+            foreach ($errors as $error) {
+                $exception[$error['code']] = ErrorTypes::get($error['code']);
+            }
+
+            throw new FedexBadResponseException(json_encode($exception));
+        }
+
     }
 
     public function getShipmentRegulatoryDetails() {
@@ -169,7 +177,6 @@ class Fedex {
 
         try {
             $results = $this->client->makeRequest('POST', Endpoints::SHIPMENT_REGULATORY_DETAILS->getEndpoint(), [], $headers);
-            $haha = $results;
 
             return $results;
         } catch (FedexException $e) {
@@ -202,5 +209,38 @@ class Fedex {
         ];
         $results = $this->client->makeRequest('GET', Endpoints::RETRIEVE_ASYNC_SHIPMENT->getEndpoint(), [], $headers);
         $haha = $results;
+    }
+
+    public function calculateShipment($data) {
+
+        try {
+            $headers = [
+                'Content-Type' => 'application/json',
+                'x-locale' => 'en_US',
+            ];
+            $results = $this->client->makeRequest('POST', Endpoints::RATES_AND_TRANSIT_TIMES->getEndpoint(), $data, $headers);
+
+            return $results;
+        } catch (FedexException $e) {
+            $errors = json_decode($e->getMessage(), true);
+            $exception = [];
+            if ($errors['transactionId']) {
+                try {
+                    $this->retrieveASyncShipment($errors['transactionId']);
+                } catch (FedexException $e) {
+                    $errors = json_decode($e->getMessage(), true);
+                    foreach ($errors as $error) {
+                        $exception[$error['code']] = ErrorTypes::get($error['code']);
+                    }
+                    throw new FedexBadResponseException(json_encode($exception));
+                }
+
+            }
+            foreach ($errors as $error) {
+                $exception[$error['code']] = ErrorTypes::get($error['code']);
+            }
+
+            throw new FedexBadResponseException(json_encode($exception));
+        }
     }
 }
