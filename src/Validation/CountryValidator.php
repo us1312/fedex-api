@@ -2,8 +2,6 @@
 
 namespace SCA\FedexApi\Validation;
 
-use SCA\FedexApi\Exception\InvalidCountryException;
-
 class CountryValidator {
 
     private iterable $countries;
@@ -12,21 +10,23 @@ class CountryValidator {
         $this->countries = $countries;
     }
 
-    public function validateCountry($country) {
+    public function validateCountry($country): bool {
         foreach ($this->countries as $country) {
             if ($country->supports($country)) {
                 return true;
             }
         }
 
-        throw new InvalidCountryException();
+        return false;
     }
 
-    public function normalizeCountryToCode($country) {
+    public function normalizeCountryToCode($country): ?string {
         foreach ($this->countries as $country) {
             if ($country->supports($country)) {
                 return $country->getCountryCode();
             }
         }
+
+        return null;
     }
 }
