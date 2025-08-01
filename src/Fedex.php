@@ -27,29 +27,34 @@ class Fedex {
     }
 
     public function validateAddress(array $street, string $country, string $city = '', string $state = '', string $postal = '', ) {
-        if (!$this->countryValidator->validateCountry($country)) {
-            return false;
-        }
-        $country = $this->countryValidator->normalizeCountryToCode($country);
-        $headers = [
-            'Content-Type' => 'application/json',
-            'x-locale' => 'en_US',
-        ];
-        $body = [
-            'addressesToValidate' => [
-                [
-                    'address' => [
-                        'streetLines' => $street,
-                        'city' => $city,
-                        'stateOrProvinceCode' => $state,
-                        'postalCode' => $postal,
-                        'countryCode' => $country,
-                    ],
+        try {
+            if (!$this->countryValidator->validateCountry($country)) {
+                return false;
+            }
+            $country = $this->countryValidator->normalizeCountryToCode($country);
+            $headers = [
+                'Content-Type' => 'application/json',
+                'x-locale' => 'en_US',
+            ];
+            $body = [
+                'addressesToValidate' => [
+                    [
+                        'address' => [
+                            'streetLines' => $street,
+                            'city' => $city,
+                            'stateOrProvinceCode' => $state,
+                            'postalCode' => $postal,
+                            'countryCode' => $country,
+                        ],
+                    ]
                 ]
-            ]
-        ];
+            ];
 
-        return $this->client->makeRequest('POST', Endpoints::ADDRESS->getEndpoint(), $body, $headers);
+            return $this->client->makeRequest('POST', Endpoints::ADDRESS->getEndpoint(), $body, $headers);
+        } catch (FedexException $th) {
+            $this->errorHandlerFunction($th);
+        }
+
     }
 
     public function createShipment(array $data) {
@@ -61,25 +66,7 @@ class Fedex {
 
             return $this->client->makeRequest('POST', Endpoints::CREATE_SHIPMENT->getEndpoint(), $data, $headers);;
         } catch (FedexException $e) {
-            $errors = json_decode($e->getMessage(), true);
-            $exception = [];
-            if ($errors['transactionId']) {
-                try {
-                    $this->retrieveASyncShipment($errors['transactionId']);
-                } catch (FedexException $e) {
-                    $errors = json_decode($e->getMessage(), true);
-                    foreach ($errors as $error) {
-                        $exception[$error['code']] = ErrorTypes::get($error['code']);
-                    }
-                    throw new FedexBadResponseException(json_encode($exception));
-                }
-
-            }
-            foreach ($errors as $error) {
-                $exception[$error['code']] = ErrorTypes::get($error['code']);
-            }
-
-            throw new FedexBadResponseException(json_encode($exception));
+            $this->errorHandlerFunction($e);
         }
     }
 
@@ -109,25 +96,7 @@ class Fedex {
         try {
             return $this->client->makeRequest('POST', Endpoints::UPLOAD_DOCUMENT->getEndpoint(), $body, $headers);
         } catch (FedexException $e) {
-            $errors = json_decode($e->getMessage(), true);
-            $exception = [];
-            if ($errors['transactionId']) {
-                try {
-                    $this->retrieveASyncShipment($errors['transactionId']);
-                } catch (FedexException $e) {
-                    $errors = json_decode($e->getMessage(), true);
-                    foreach ($errors as $error) {
-                        $exception[$error['code']] = ErrorTypes::get($error['code']);
-                    }
-                    throw new FedexBadResponseException(json_encode($exception));
-                }
-
-            }
-            foreach ($errors as $error) {
-                $exception[$error['code']] = ErrorTypes::get($error['code']);
-            }
-
-            throw new FedexBadResponseException(json_encode($exception));
+            $this->errorHandlerFunction($e);
         }
     }
 
@@ -139,26 +108,7 @@ class Fedex {
         try {
             return $this->client->makeRequest('POST', Endpoints::SHIPMENT_REGULATORY_DETAILS->getEndpoint(), [], $headers);;
         } catch (FedexException $e) {
-            $errors = json_decode($e->getMessage(), true);
-            $exception = [];
-
-            if ($errors['transactionId']) {
-                try {
-                    $this->retrieveASyncShipment($errors['transactionId']);
-                } catch (FedexException $e) {
-                    $errors = json_decode($e->getMessage(), true);
-                    foreach ($errors as $error) {
-                        $exception[$error['code']] = ErrorTypes::get($error['code']);
-                    }
-                    throw new FedexBadResponseException(json_encode($exception));
-                }
-
-            }
-            foreach ($errors as $error) {
-                $exception[$error['code']] = ErrorTypes::get($error['code']);
-            }
-
-            throw new FedexBadResponseException(json_encode($exception));
+            $this->errorHandlerFunction($e);
         }
     }
 
@@ -179,25 +129,29 @@ class Fedex {
             ];
             return $this->client->makeRequest('POST', Endpoints::RATES_AND_TRANSIT_TIMES->getEndpoint(), $data, $headers);;
         } catch (FedexException $e) {
-            $errors = json_decode($e->getMessage(), true);
-            $exception = [];
-            if ($errors['transactionId']) {
-                try {
-                    $this->retrieveASyncShipment($errors['transactionId']);
-                } catch (FedexException $e) {
-                    $errors = json_decode($e->getMessage(), true);
-                    foreach ($errors as $error) {
-                        $exception[$error['code']] = ErrorTypes::get($error['code']);
-                    }
-                    throw new FedexBadResponseException(json_encode($exception));
-                }
-
-            }
-            foreach ($errors as $error) {
-                $exception[$error['code']] = ErrorTypes::get($error['code']);
-            }
-
-            throw new FedexBadResponseException(json_encode($exception));
+            $this->errorHandlerFunction($e);
         }
+    }
+
+    private function errorHandlerFunction($e) {
+        $errors = json_decode($e->getMessage(), true);
+        $exception = [];
+        if ($errors['transactionId']) {
+            try {
+                $this->retrieveASyncShipment($errors['transactionId']);
+            } catch (FedexException $e) {
+                $errors = json_decode($e->getMessage(), true);
+                foreach ($errors['errors'] as $error) {
+                    $exception[$error['code']] = ErrorTypes::get($error['code']);
+                }
+                throw new FedexBadResponseException(json_encode($exception));
+            }
+
+        }
+        foreach ($errors as $error) {
+            $exception[$error['code']] = ErrorTypes::get($error['code']);
+        }
+
+        throw new FedexBadResponseException(json_encode($exception));
     }
 }
