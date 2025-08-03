@@ -8,11 +8,14 @@ use SCA\FedexApi\Exception\FedexBadResponseException;
 use SCA\FedexApi\Exception\FedexException;
 use SCA\FedexApi\Validation\CountryValidator;
 use Symfony\Component\DependencyInjection\Attribute\TaggedIterator;
+use Symfony\Component\Mime\MimeTypes;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 class Fedex {
 
-    private CountryValidator $countryValidator;
+    private ?CountryValidator $countryValidator;
+
+    private ?Client $client;
 
     public function __construct(
         private readonly HttpClientInterface $httpClient,
@@ -70,29 +73,33 @@ class Fedex {
         }
     }
 
-    public function uploadDocument(string $pdfFile, string $filename, string $fileType, string $documentType, $originCountryCode, $deliveryCountryCode) {
+    public function uploadDocument(string $filePath, string $documentType, $originCountryCode, $deliveryCountryCode) {
         $headers = [
             'Content-Type' => 'multipart/form-data',
         ];
 
-        $body = [
-            'document' => [
-                'workflowName' => 'ETDPreshipment',
-                'name' => basename($pdfFile),
-                'contentType' => $fileType,
-                'meta' => [
-                    'shipDocumentType' => $documentType, // COMMERCIAL_INVOICE
-                    'originCountryCode' => $originCountryCode,
-                    'destinationCountryCode' => $deliveryCountryCode,
-                ]
-            ],
-        ];
-        $fOpen = fopen($pdfFile, 'r');
-        $fRead = fread($fOpen, filesize($pdfFile));
-        fclose($fOpen);
+        $mimeTypeService = MimeTypes::getDefault();
+        $mimeType = $mimeTypeService->guessMimeType($filePath);
+        $extension = $mimeTypeService->getExtensions($mimeType);
+        $filename = substr(strtr(base64_encode(random_bytes(8)), '+/', ''), 0, 10) . '.' . $extension[array_key_first($extension)];
 
-        $body['attachment'] = $fRead;
-        $body['document'] = json_encode($body['document']);
+        $docData = [
+            'workflowName' => 'ETDPreshipment',
+            'name' => $filename,
+            'contentType' => $mimeTypeService->guessMimeType($filePath),
+            'meta' => [
+                'shipDocumentType' => $documentType, // COMMERCIAL_INVOICE
+                'originCountryCode' => $originCountryCode,
+                'destinationCountryCode' => $deliveryCountryCode,
+            ]
+        ];
+        $fileHandle = fopen($filePath, 'r');
+        stream_context_set_option($fileHandle, 'http', 'filename', $filename);
+        stream_context_set_option($fileHandle, 'http', 'content-type', $mimeType);
+        $body = [
+            'document' => json_encode($docData),
+            'attachment' => $fileHandle
+        ];
         try {
             return $this->client->makeRequest('POST', Endpoints::UPLOAD_DOCUMENT->getEndpoint(), $body, $headers);
         } catch (FedexException $e) {
