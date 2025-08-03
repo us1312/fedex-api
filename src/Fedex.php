@@ -70,7 +70,7 @@ class Fedex {
         }
     }
 
-    public function uploadDocument(string $pdfFile, string $documentName) {
+    public function uploadDocument(string $pdfFile, string $filename, string $fileType, string $documentType, $originCountryCode, $deliveryCountryCode) {
         $headers = [
             'Content-Type' => 'multipart/form-data',
         ];
@@ -79,11 +79,11 @@ class Fedex {
             'document' => [
                 'workflowName' => 'ETDPreshipment',
                 'name' => basename($pdfFile),
-                'contentType' => 'application/pdf',
+                'contentType' => $fileType,
                 'meta' => [
-                    'shipDocumentType' => 'PRO_FORMA_INVOICE', // COMMERCIAL_INVOICE
-                    'originCountryCode' => 'PL',
-                    'destinationCountryCode' => 'JP',
+                    'shipDocumentType' => $documentType, // COMMERCIAL_INVOICE
+                    'originCountryCode' => $originCountryCode,
+                    'destinationCountryCode' => $deliveryCountryCode,
                 ]
             ],
         ];

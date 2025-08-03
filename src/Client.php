@@ -38,8 +38,12 @@ class Client {
         if (is_array($body) && in_array($headers['Content-Type'], ['application/json'])) {
             $body = json_encode($body);
         }
+        if ($endpoint === Endpoints::UPLOAD_DOCUMENT->getEndpoint()) {
+            $url = 'https://documentapitest.prod.fedex.com/sandbox/documents/v1/etds/upload';
+        } else {
+            $url = $this->apiUrl . '/' . $endpoint;
+        }
 
-        $url = $this->apiUrl . '/' . $endpoint;
         $response  = $this->httpClient->request($type, $url, [
             'headers' => $headers,
             'body' => $body
