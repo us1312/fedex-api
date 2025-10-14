@@ -39,7 +39,7 @@ class Client {
             $body = json_encode($body);
         }
         if ($endpoint === Endpoints::UPLOAD_DOCUMENT->getEndpoint()) {
-            $url = 'https://documentapitest.prod.fedex.com/sandbox/documents/v1/etds/upload';
+            $url = 'https://documentapi.prod.fedex.com/documents/v1/etds/upload';
         } else {
             $url = $this->apiUrl . '/' . $endpoint;
         }
@@ -80,9 +80,10 @@ class Client {
 
         if (200 === $status && json_validate($content)) {
             return json_decode($content, true);
+        } else if (201 === $status) {
+            return json_decode($content, true);
         } else if (json_validate($content)) {
             $content = json_decode($content, true);
-            $message = [];
             if (isset($content)) {
                 throw new FedexBadResponseException(json_encode($content));
             }
