@@ -139,26 +139,30 @@ class Fedex {
             $this->errorHandlerFunction($e);
         }
     }
-
-    private function errorHandlerFunction($e) {
-        $errors = json_decode($e->getMessage(), true);
+    
+    private function errorHandlerFunction(\Exception $e) {
+        $decoded = json_decode($e->getMessage(), true);
         $exception = [];
-        if ($errors['transactionId']) {
-            try {
-                $this->retrieveASyncShipment($errors['transactionId']);
-            } catch (FedexException $e) {
-                $errors = json_decode($e->getMessage(), true);
-                foreach ($errors['errors'] as $error) {
-                    $exception[$error['code']] = ErrorTypes::get($error['code']);
-                }
-                throw new FedexBadResponseException(json_encode($exception));
+        if (!empty($decoded['errors'])) {
+            foreach ($decoded['errors'] as $error) {
+                $exception[$error['code']] = ErrorTypes::get($error['code']);
             }
-
         }
-        foreach ($errors as $error) {
-            $exception[$error['code']] = ErrorTypes::get($error['code']);
+        if (!empty($decoded['transactionId'])) {
+            try {
+                $this->retrieveASyncShipment($decoded['transactionId']);
+            } catch (FedexException $asyncException) {
+                $asyncDecoded = json_decode($asyncException->getMessage(), true);
+                if (!empty($asyncDecoded['errors'])) {
+                    foreach ($asyncDecoded['errors'] as $error) {
+                        $exception[$error['code']] = ErrorTypes::get($error['code']);
+                    }
+                }
+            }
         }
-
+        if (empty($exception)) {
+            throw $e;
+        }
         throw new FedexBadResponseException(json_encode($exception));
     }
 }
