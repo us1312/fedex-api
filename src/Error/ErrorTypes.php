@@ -931,10 +931,17 @@ class ErrorTypes
         'REQUESTEDPACKAGELINEITEMS.VARIABLEHANDLINGCHARGE.INVALID' => 'Niepoprawne dane dotyczące zmiennej opłaty za obsługę na poziomie przesyłki. Jeśli oczekiwana jest wartość procentowa, wymagany jest zarówno typ elementu stawki, jak i element stawki. Zaktualizuj i spróbuj ponownie.',
         'STREETLINES.TOO.LONG' => 'Nie możemy zrealizować tego wyboru. Spróbuj później lub skontaktuj się z Biurem Obsługi Klienta FedEx.',
         'PERSONNAME.TOO.LONG' => 'Za długie nazwisko.',
-        'CITY.EMPTY' => 'Pole „Miasto” powinno zawierać co najmniej 3 znaki.'
+        'CITY.EMPTY' => 'Pole „Miasto” powinno zawierać co najmniej 3 znaki.',
+        'METHOD.NOT.ALLOWED.ERROR' => 'Niedozwolona Metoda',
+        'INVALID.INPUT.EXCEPTION' => 'Nieprowidłowe wprowadzone dane'
+        
     ];
-
+    
     public static function get($code) {
-        return self::$errors[$code];
+        if (isset(self::$errors[$code])) {
+            return self::$errors[$code];
+        }
+        
+        return sprintf('Unknown error code: %s', $code);
     }
 }
